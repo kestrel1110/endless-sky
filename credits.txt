@@ -1,5 +1,5 @@
 Welcome to Endless Sky!
-version 0.9.14
+version 0.9.14-experimental
 
 This game is open source.
 To report bugs, give feedback,
@@ -8,6 +8,9 @@ artwork, or programming, visit:
 - https://endless-sky.github.io
 - The game's Steam forums
 - Discord (invite: ZeuASSx)
+
+This branch created by: 
+  Kestrel1110 (Bereskatuket)
 
 Creator and Lead Programmer
   Michael Zahniser
