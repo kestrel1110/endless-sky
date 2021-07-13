@@ -3491,6 +3491,16 @@ void AI::MovePlayer(Ship &ship, const PlayerInfo &player, Command &activeCommand
 				++index;
 			}
 		}
+		if(activeCommands.Has(Command::TURRET))
+		{
+			int index = 0;
+			for(const Hardpoint &hardpoint : ship.Weapons())
+			{
+				if(hardpoint.IsReady() && !hardpoint.GetOutfit()->Icon() && hardpoint.IsTurret())
+					command.SetFire(index);
+				++index;
+			}
+		}
 		if(activeCommands.Has(Command::SECONDARY))
 		{
 			int index = 0;
