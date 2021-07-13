@@ -151,6 +151,8 @@ void PlayerInfo::Load(const string &path)
 			hasFullClearance = true;
 		else if(child.Token(0) == "launching")
 			shouldLaunch = true;
+		else if(child.Token(0) == "cloaking")
+			isCloaking = true;
 		else if(child.Token(0) == "playtime" && child.Size() >= 2)
 			playTime = child.Value(1);
 		else if(child.Token(0) == "travel" && child.Size() >= 2)
@@ -680,6 +682,20 @@ const StellarObject *PlayerInfo::GetStellarObject() const
 bool PlayerInfo::ShouldLaunch() const
 {
 	return shouldLaunch;
+}
+
+
+
+bool PlayerInfo::IsCloaking() const
+{
+	return isCloaking;
+}
+
+
+
+void PlayerInfo::SetIsCloaking(bool cloaking)
+{
+	isCloaking = cloaking;
 }
 
 
@@ -2794,6 +2810,8 @@ void PlayerInfo::Save(const string &path) const
 	// entering their ship (i.e. because a mission forced them to take off).
 	if(shouldLaunch)
 		out.Write("launching");
+	if(isCloaking)
+		out.Write("cloaking");
 	for(const System *system : travelPlan)
 		out.Write("travel", system->Name());
 	if(travelDestination)
