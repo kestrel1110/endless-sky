@@ -1303,7 +1303,7 @@ void Engine::CalculateStep()
 	const Ship *flagship = player.Flagship();
 	bool wasHyperspacing = (flagship && flagship->IsEnteringHyperspace());
 	// Move all the ships.
-	for(const shared_ptr<Ship> &it : ships)
+	for(shared_ptr<Ship> &it : ships)
 		MoveShip(it);
 	// If the flagship just began jumping, play the appropriate sound.
 	if(!wasHyperspacing && flagship && flagship->IsEnteringHyperspace())
@@ -1499,7 +1499,7 @@ void Engine::CalculateStep()
 
 // Move a ship. Also determine if the ship should generate hyperspace sounds or
 // boarding events, fire weapons, and launch fighters.
-void Engine::MoveShip(const shared_ptr<Ship> &ship)
+void Engine::MoveShip(shared_ptr<Ship> &ship)
 {
 	const Ship *flagship = player.Flagship();
 	
@@ -1509,6 +1509,41 @@ void Engine::MoveShip(const shared_ptr<Ship> &ship)
 	// Give the ship the list of visuals so that it can draw explosions,
 	// ion sparks, jump drive flashes, etc.
 	ship->Move(newVisuals, newFlotsam);
+	// If the ship has been destroyed but isn't yet removed, deploy any escape pods.
+	if(ship->IsDestroyed() && ship->HasEscapePods())
+	{
+		bool flag = (ship.get() == flagship);
+		vector<pair<const Ship *, int>> &pods = ship->EscapePods();
+		for(auto it = pods.begin(); it != pods.end(); ++it)
+		{
+			// The player's escape pod ejects immediately, but all other escape pods 
+			// eject at random times.
+			if((!flag && Random::Int(30)) || !(*it).first->IsValid())
+				continue;
+			
+			auto pod = make_shared<Ship>(*(*it).first);
+			if((--(*it).second) <= 0)
+				pods.erase(it--);
+			
+			pod->WasEjected(ship);
+			newShips.push_back(pod);
+			double maxV = pod->MaxVelocity() * 3;
+			Angle angle = Angle::Random();
+			Point v = ship->Velocity() + (.3 * maxV) * angle.Unit() + (.2 * maxV) * Angle::Random().Unit();
+			pod->Place(ship->Position(), v, angle);
+			pod->SetSystem(ship->GetSystem());
+			
+			if(ship->IsYours())
+				player.AddShip(pod);
+			// If the player's flagship ejected an escape pod, the escape pod is
+			// now the player's flagship.
+			if(flag)
+			{
+				player.SetFlagship(pod);
+				flag = false;
+			}
+		}
+	}
 	// Bail out if the ship just died.
 	if(ship->ShouldBeRemoved())
 	{

@@ -258,6 +258,8 @@ public:
 	void Restore();
 	// Check if this ship has been destroyed.
 	bool IsDestroyed() const;
+	bool HasEscapePods() const;
+	std::vector<std::pair<const Ship *, int>> &EscapePods();
 	// Recharge and repair this ship (e.g. because it has landed).
 	void Recharge(bool atSpaceport = true);
 	// Check if this ship is able to give the given ship enough fuel to jump.
@@ -266,6 +268,7 @@ public:
 	double TransferFuel(double amount, Ship *to);
 	// Mark this ship as property of the given ship.
 	void WasCaptured(const std::shared_ptr<Ship> &capturer);
+	void WasEjected(const std::shared_ptr<Ship> &ejector);
 	
 	// Get characteristics of this ship, as a fraction between 0 and 1.
 	double Shields() const;
@@ -468,6 +471,7 @@ private:
 	bool neverDisabled = false;
 	bool isCapturable = true;
 	bool isInvisible = false;
+	int untargetable = 0;
 	int customSwizzle = -1;
 	double cloak = 0.;
 	double cloakDisruption = 0.;

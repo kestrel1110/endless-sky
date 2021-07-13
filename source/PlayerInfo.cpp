@@ -470,6 +470,21 @@ bool PlayerInfo::IsDead() const
 
 
 
+// Set the player's flagship. To be used while in space when the player
+// ejects in an escape pod.
+void PlayerInfo::SetFlagship(shared_ptr<Ship> flagship)
+{
+	this->flagship = flagship;
+	// Make sure your jump-capable ships all know who the new flagship is.
+	for(const shared_ptr<Ship> &ship : ships)
+	{
+		bool shouldHaveParent = (ship != flagship && !ship->IsParked() && (!ship->CanBeCarried() || ship->JumpFuel()));
+		ship->SetParent(shouldHaveParent ? flagship : shared_ptr<Ship>());
+	}
+}
+
+
+
 // Get the player's first name.
 const string &PlayerInfo::FirstName() const
 {
@@ -1785,9 +1800,11 @@ void PlayerInfo::HandleEvent(const ShipEvent &event, UI *ui)
 	for(Mission &mission : missions)
 		mission.Do(event, *this, ui);
 	
-	// If the player's flagship was destroyed, the player is dead.
-	if((event.Type() & ShipEvent::DESTROY) && !ships.empty() && event.Target().get() == Flagship())
-		Die();
+	// If the player's flagship was destroyed and they don't have an escape pod,
+	// the player is dead.
+	if((event.Type() & ShipEvent::DESTROY) && !ships.empty()
+		&& event.Target().get() == Flagship() && !Flagship()->HasEscapePods())
+			Die();
 }
 
 

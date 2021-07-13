@@ -829,6 +829,9 @@ void Ship::Save(DataWriter &out) const
 			for(const auto &it : baseAttributes.HyperOutSounds())
 				for(int i = 0; i < it.second; ++i)
 					out.Write("hyperdrive out sound", it.first->Name());
+			for(const auto &it : baseAttributes.EscapePods())
+				for(int i = 0; i < it.second; ++i)
+					out.Write("escape pod", it.first->VariantName());
 			for(const auto &it : baseAttributes.Attributes())
 				if(it.second)
 					out.Write(it.first, it.second);
@@ -1314,6 +1317,7 @@ void Ship::Move(vector<Visual> &visuals, list<shared_ptr<Flotsam>> &flotsam)
 	// long that it should be "forgotten." Also eliminate ships that have no
 	// system set because they just entered a fighter bay.
 	forget += !isInSystem;
+	untargetable = max(0, untargetable - 1);
 	isThrusting = false;
 	isReversing = false;
 	isSteering = false;
@@ -2393,7 +2397,7 @@ bool Ship::IsCapturable() const
 
 bool Ship::IsTargetable() const
 {
-	return (zoom == 1.f && !explosionRate && !forget && !isInvisible && cloak < 1. && hull >= 0. && hyperspaceCount < 70);
+	return (zoom == 1.f && !explosionRate && !forget && !isInvisible && cloak < 1. && hull >= 0. && hyperspaceCount < 70 && !untargetable);
 }
 
 
@@ -2633,6 +2637,20 @@ bool Ship::IsDestroyed() const
 
 
 
+bool Ship::HasEscapePods() const
+{
+	return !attributes.EscapePods().empty() && !attributes.Get("automaton") && attributes.Category() != "Escape Pod";
+}
+
+
+
+vector<pair<const Ship *, int>> &Ship::EscapePods()
+{
+	return attributes.EscapePods();
+}
+
+
+
 // Recharge and repair this ship (e.g. because it has landed).
 void Ship::Recharge(bool atSpaceport)
 {
@@ -2740,6 +2758,25 @@ void Ship::WasCaptured(const shared_ptr<Ship> &capturer)
 	}
 	// This ship should not care about its now-unallied escorts.
 	escorts.clear();
+}
+
+
+
+// This ship was ejected as an escape pod. Inherit characteristics of the ejector.
+void Ship::WasEjected(const shared_ptr<Ship> &ejector)
+{
+	government = ejector->GetGovernment();
+	// If the ejecting ship had a parent, use that as the escape pod's parent.
+	SetParent(ejector->GetParent());
+	// This ship behaviors like its ejector did.
+	isSpecial = ejector->isSpecial;
+	isYours = ejector->isYours;
+	personality = ejector->personality;
+	
+	// Escape pods won't get targeted for the first 3 seconds after being ejected.
+	// Escape pods are very fragile ships, and this gives them a chance to escape.
+	if(attributes.Category() == "Escape Pod")
+		untargetable = 180;
 }
 
 
