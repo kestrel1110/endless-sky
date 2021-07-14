@@ -1714,9 +1714,15 @@ void Ship::Move(vector<Visual> &visuals, list<shared_ptr<Flotsam>> &flotsam)
 		if(commands.Turn())
 		{
 			// Check if we are able to turn.
-			double cost = attributes.Get("turning energy");
-			if(energy < cost * fabs(commands.Turn()))
-				commands.SetTurn(commands.Turn() * energy / (cost * fabs(commands.Turn())));
+			double energyCost = attributes.Get("turning energy");
+			if(energy < energyCost * fabs(commands.Turn()))
+				commands.SetTurn(commands.Turn() * energy / (energyCost * fabs(commands.Turn())));
+			double fuelCost = attributes.Get("turning fuel");
+			if(fuel < fuelCost * fabs(commands.Turn()))
+				commands.SetTurn(commands.Turn() * fuel / (fuelCost * fabs(commands.Turn())));
+			double heatCost = -attributes.Get("turning heat");
+			if(heat < heatCost * fabs(commands.Turn()))
+				commands.SetTurn(commands.Turn() * heat / (heatCost * fabs(commands.Turn())));
 			
 			if(commands.Turn())
 			{
@@ -1726,8 +1732,9 @@ void Ship::Move(vector<Visual> &visuals, list<shared_ptr<Flotsam>> &flotsam)
 				// energy or because of tracking a target), only consume a fraction
 				// of the turning energy and produce a fraction of the heat.
 				double scale = fabs(commands.Turn());
-				energy -= scale * cost;
-				heat += scale * attributes.Get("turning heat");
+				energy -= scale * energyCost;
+				fuel -= scale * fuelCost;
+				heat -= scale * heatCost; // Because above, we take -1 * turning heat
 				angle += commands.Turn() * TurnRate() * slowMultiplier;
 			}
 		}
@@ -1736,10 +1743,18 @@ void Ship::Move(vector<Visual> &visuals, list<shared_ptr<Flotsam>> &flotsam)
 		if(thrustCommand)
 		{
 			// Check if we are able to apply this thrust.
-			double cost = attributes.Get((thrustCommand > 0.) ?
+			double energyCost = attributes.Get((thrustCommand > 0.) ?
 				"thrusting energy" : "reverse thrusting energy");
-			if(energy < cost)
-				thrustCommand *= energy / cost;
+			if(energy < energyCost)
+				thrustCommand = min(thrustCommand, energy / energyCost);
+			double fuelCost = attributes.Get((thrustCommand > 0.) ?
+				"thrusting fuel" : "reverse thrusting fuel");
+			if(fuel < fuelCost)
+				thrustCommand = min(thrustCommand, fuel / fuelCost);
+			double heatCost = -attributes.Get((thrustCommand > 0.) ?
+				"thrusting heat" : "reverse thrusting heat");
+			if(heat < heatCost)
+				thrustCommand = min(thrustCommand, heat / heatCost);
 			
 			if(thrustCommand)
 			{
@@ -1751,8 +1766,9 @@ void Ship::Move(vector<Visual> &visuals, list<shared_ptr<Flotsam>> &flotsam)
 				if(thrust)
 				{
 					double scale = fabs(thrustCommand);
-					energy -= scale * cost;
-					heat += scale * attributes.Get(isThrusting ? "thrusting heat" : "reverse thrusting heat");
+					energy -= scale * energyCost;
+					fuel -= scale * fuelCost;
+					heat -= scale * heatCost; // Because above we take -1 * thrusting heat
 					acceleration += angle.Unit() * (thrustCommand * thrust / mass);
 				}
 			}
