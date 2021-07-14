@@ -3657,14 +3657,6 @@ shared_ptr<Flotsam> Ship::GetTargetFlotsam() const
 
 
 
-// Movement target.
-Point Ship::GetTargetPosition() const
-{
-	return targetPosition;
-}
-
-
-
 // Set this ship's targets.
 void Ship::SetTargetShip(const shared_ptr<Ship> &ship)
 {
@@ -3713,14 +3705,6 @@ void Ship::SetTargetAsteroid(const shared_ptr<Minable> &asteroid)
 void Ship::SetTargetFlotsam(const shared_ptr<Flotsam> &flotsam)
 {
 	targetFlotsam = flotsam;
-}
-
-
-
-// Movement target.
-void Ship::SetTargetPosition(const Point &position)
-{
-	targetPosition = position;
 }
 
 
