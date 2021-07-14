@@ -409,6 +409,9 @@ public:
 	std::shared_ptr<Ship> GetParent() const;
 	const std::vector<std::weak_ptr<Ship>> &GetEscorts() const;
 	
+	// check if player previously demanded a bribe. If not, sets extorted to true.
+	bool wasExtorted();
+	
 	
 private:
 	// Add or remove a ship from this ship's list of escorts.
@@ -570,6 +573,9 @@ private:
 	// Links between escorts and parents.
 	std::vector<std::weak_ptr<Ship>> escorts;
 	std::weak_ptr<Ship> parent;
+	
+	// has ship been extorted
+	bool extorted = false;
 };
 
 
