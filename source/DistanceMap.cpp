@@ -35,7 +35,7 @@ DistanceMap::DistanceMap(const System *center, int maxCount, int maxDistance)
 
 // If a player is given, the map will only use hyperspace paths known to the
 // player; that is, one end of the path has been visited. Also, if the
-// player's flagship has a jump drive, the jumps will be make use of it.
+// player's flagship has a jump drive, the jumps will use it.
 DistanceMap::DistanceMap(const PlayerInfo &player, const System *center)
 	: player(&player)
 {
@@ -96,9 +96,9 @@ const System *DistanceMap::Route(const System *system) const
 	auto it = route.find(system);
 	return (it == route.end() ? nullptr : it->second.next);
 }
-	
-	
-	
+
+
+
 // Get a set containing all the systems.
 set<const System *> DistanceMap::Systems() const
 {
@@ -295,11 +295,16 @@ void DistanceMap::Add(const System &to, Edge edge)
 
 
 
-// Check whether the given link is travelable. If no player was given in the
-// constructor then this is always true; otherwise, the player must know
-// that the given link exists.
+// Check whether the given link is travelable. If it is a link to the hidden
+// system, it is only travelable if it is a hyperspace link. Otherwise, if no
+// player was given in the constructor then this is always true; otherwise,
+// the player must know that the given link exists.
 bool DistanceMap::CheckLink(const System &from, const System &to, bool useJump) const
 {
+	// Hidden systems are only reachable via hyperspace links.
+	if(useJump && to.Hidden())
+		return false;
+	
 	if(!player)
 		return true;
 	
