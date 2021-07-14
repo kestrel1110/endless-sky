@@ -2012,13 +2012,7 @@ void Ship::DoGeneration()
 	
 	heat -= heat * HeatDissipation();
 	if(heat > MaximumHeat())
-	{
 		isOverheated = true;
-		float cookHeat = attributes.Get("cook temperature");
-		if(cookHeat && Heat() > cookHeat) {
-			hull -= attributes.Get("cooking rate")* Heat();
-		}
-	}
 	else if(heat < .9 * MaximumHeat())
 		isOverheated = false;
 	
