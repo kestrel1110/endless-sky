@@ -17,12 +17,14 @@ category "ship"
 	"Light Warship"
 	"Medium Warship"
 	"Heavy Warship"
+	"Breakaway"
 	"Fighter"
 	"Drone"
 
 
 # Ships of these types are able to be carried by other ships.
 category "bay type"
+	"Breakaway"
 	"Drone"
 	"Fighter"
 
