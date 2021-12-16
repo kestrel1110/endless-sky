@@ -8,6 +8,17 @@
 # WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
 # PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
+
+effect "archon teleport"
+	sprite "effect/archonteleport"
+		"no repeat"
+		"frame rate" 30
+	sound "archonteleport2"
+	"random spin" 1
+	"lifetime" 41
+
+# sound source: https://freesound.org/people/oldestmillennial/sounds/533025/ (modified)
+
 effect "jump drive"
 	sprite "effect/jump drive"
 		"no repeat"
