@@ -14,7 +14,6 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
 #include "DataNode.h"
 #include "Files.h"
-#include "FormationPattern.h"
 #include "GameData.h"
 #include "Government.h"
 #include "Phrase.h"
@@ -199,8 +198,6 @@ void Fleet::Load(const DataNode &node)
 		}
 		else if(key == "personality")
 			personality.Load(child);
-		else if(key == "formation" && child.Size() >= 2)
-			formation = GameData::Formations().Get(child.Token(1));
 		else if(key == "variant" && !remove)
 		{
 			if(resetVariants && !add)
@@ -644,7 +641,6 @@ vector<shared_ptr<Ship>> Fleet::Instantiate(const Variant &variant) const
 			ship->SetName(phrase->Get());
 		ship->SetGovernment(government);
 		ship->SetPersonality(personality);
-		ship->SetFormationPattern(formation);
 		
 		placed.push_back(ship);
 	}

@@ -16,9 +16,6 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 #include "Command.h"
 #include "DistanceMap.h"
 #include "Flotsam.h"
-#include "FormationPattern.h"
-#include "FormationPositioner.h"
-#include "GameData.h"
 #include "Government.h"
 #include "Hardpoint.h"
 #include "Mask.h"
@@ -125,44 +122,6 @@ namespace {
 			if(bay.ship && (includingDamaged || bay.ship->Health() > .75) &&
 					(!bay.ship->IsYours() || bay.ship->HasDeployOrder()))
 				bay.ship->SetCommands(Command::DEPLOY);
-	}
-	
-	// Helper function for selecting the ships for formation commands.
-	vector<Ship *> GetShipsForFormationCommand(const PlayerInfo &player)
-	{
-		// Figure out what ships we are giving orders to
-		vector<Ship *> targetShips;
-		auto selectedShips = player.SelectedShips();
-		bool fullFleet = selectedShips.empty();
-		if(fullFleet)
-		{
-			auto playerShips = player.Ships();
-			targetShips.reserve(playerShips.size() - 1);
-			for(const shared_ptr<Ship> &it : player.Ships())
-				if(it.get() != player.Flagship() && !it->IsParked()
-					&& !it->IsDestroyed())
-					targetShips.push_back(it.get());
-		}
-		else
-		{
-			targetShips.reserve(selectedShips.size());
-			for(const weak_ptr<Ship> &it : selectedShips)
-			{
-				shared_ptr<Ship> ship = it.lock();
-				if(ship)
-					targetShips.push_back(ship.get());
-			}
-		}
-		
-		// This should never happen, but just in case:
-		if(targetShips.empty())
-		{
-			if(fullFleet)
-				Messages::Add("No ships in the fleet to change formation for.", Messages::Importance::High);
-			else
-				Messages::Add("No ships selected that can change formation.", Messages::Importance::High);
-		}
-		return targetShips;
 	}
 	
 	// Issue deploy orders for the selected ships (or the full fleet if no ships are selected).
@@ -349,126 +308,7 @@ AI::AI(const List<Ship> &ships, const List<Minable> &minables, const List<Flotsa
 
 
 
-
-
-
-
 // Fleet commands from the player.
-void AI::IssueFormationChange(const PlayerInfo &player)
-{
-	// Figure out what ships we are giving orders to
-	vector<Ship *> targetShips = GetShipsForFormationCommand(player);
-	
-	// This should never happen, but just in case:
-	if(targetShips.empty())
-		return;
-	
-	const auto &formationPatterns = GameData::Formations();
-	if(formationPatterns.size() < 1)
-	{
-		Messages::Add("No formations available.", Messages::Importance::High);
-		return;
-	}
-	
-	// First check which and how many formation patterns we have in the current set of selected ships.
-	// If there is more than 1 pattern in the selection, then this command will change all selected
-	// ships to use the pattern that was found first. If there is only 1 pattern, then this command
-	// will change all selected ships to use the next pattern available.
-	const FormationPattern *toSet = nullptr;
-	bool multiplePatternsSet = false;
-	for(Ship *ship : targetShips)
-	{
-		const FormationPattern *shipsPattern = ship->GetFormationPattern();
-		if(shipsPattern)
-		{
-			if(!toSet)
-				toSet = shipsPattern;
-			else if(toSet != shipsPattern)
-			{
-				multiplePatternsSet = true;
-				break;
-			}
-		}
-	}
-	
-	// Now determine what formationPattern to set.
-	if(!toSet)
-		// If no pattern was set at all, then we set the first one from the set of formationPatterns.
-		toSet = &(formationPatterns.begin()->second);
-	else if(!multiplePatternsSet)
-	{
-		// If only one pattern was found, then select the next pattern (or clear the pattern if there is no next).
-		auto it = formationPatterns.find(toSet->Name());
-		if(it != formationPatterns.end())
-			++it;
-		toSet = (it == formationPatterns.end() ? nullptr : &(it->second));
-	}
-	//else if (multiplePatternsSet) {
-	// If more than one formation was found on the ships, then we set the pattern it to the first one found.
-	// No code is needed here for this option, since all variables are already set to just apply the change below.
-	//}
-	
-	// Now set the pattern on the selected ships.
-	for(Ship *ship : targetShips)
-		if(ship->GetFormationPattern() != toSet)
-			ship->SetFormationPattern(toSet);
-	
-	if(toSet)
-		Messages::Add(to_string(targetShips.size()) + " ships are now flying in " + toSet->Name() + " formation.", Messages::Importance::Low);
-	else
-		Messages::Add(to_string(targetShips.size()) + " ships are no longer flying in formation.", Messages::Importance::Low);
-}
-
-
-
-// Fleet commands from the player.
-void AI::IssueFormationRingDecrease(const PlayerInfo &player)
-{
-	// Figure out what ships we are giving orders to
-	vector<Ship *> targetShips = GetShipsForFormationCommand(player);
-	
-	// This should never happen, but just in case:
-	if(targetShips.empty())
-		return;
-	
-	for(Ship *ship : targetShips)
-		ship->SetFormationRing(0);
-	
-	Messages::Add(to_string(targetShips.size()) + " ships are now flying in formation ring 0.", Messages::Importance::Low);
-}
-
-
-
-// Fleet commands from the player.
-void AI::IssueFormationRingIncrease(const PlayerInfo &player)
-{
-	// Figure out what ships we are giving orders to
-	vector<Ship *> targetShips = GetShipsForFormationCommand(player);
-	
-	// This should never happen, but just in case:
-	if(targetShips.empty())
-		return;
-	
-	// First check which and how many formations we have in the current set of selected ships.
-	int maxRing = 0;
-	for(Ship *ship : targetShips)
-	{
-		int shipRing = ship->GetFormationRing();
-		if(shipRing > maxRing)
-			maxRing = shipRing;
-	}
-	maxRing++;
-	
-	// Now set the new ring on the selected ships.
-	for(Ship *ship : targetShips)
-		ship->SetFormationRing(maxRing);
-	
-	Messages::Add(to_string(targetShips.size()) + " ships are now flying in ring " + to_string(maxRing) + " of their formation.", Messages::Importance::Low);
-}
-
-
-
-
 void AI::IssueShipTarget(const PlayerInfo &player, const shared_ptr<Ship> &target)
 {
 	Orders newOrders;
@@ -543,33 +383,20 @@ void AI::UpdateKeys(PlayerInfo &player, Command &activeCommands)
 	if(activeCommands.Has(Command::DEPLOY))
 		IssueDeploy(player);
 	
-	bool shift = activeCommands.Has(Command::SHIFT);
-	
-	// The gather, hold and fight commands control formation flying when combined with shift.
-	if(shift)
-	{
-		if(activeCommands.Has(Command::GATHER))
-			IssueFormationChange(player);
-		else if(activeCommands.Has(Command::FIGHT))
-			IssueFormationRingIncrease(player);
-		else if(activeCommands.Has(Command::HOLD))
-			IssueFormationRingDecrease(player);
-	}
-	
 	shared_ptr<Ship> target = flagship->GetTargetShip();
 	Orders newOrders;
-	if(activeCommands.Has(Command::FIGHT) && target && !target->IsYours() && !shift)
+	if(activeCommands.Has(Command::FIGHT) && target && !target->IsYours())
 	{
 		newOrders.type = target->IsDisabled() ? Orders::FINISH_OFF : Orders::ATTACK;
 		newOrders.target = target;
 		IssueOrders(player, newOrders, "focusing fire on \"" + target->Name() + "\".");
 	}
-	if(activeCommands.Has(Command::HOLD) && !shift)
+	if(activeCommands.Has(Command::HOLD))
 	{
 		newOrders.type = Orders::HOLD_POSITION;
 		IssueOrders(player, newOrders, "holding position.");
 	}
-	if(activeCommands.Has(Command::GATHER) && !shift)
+	if(activeCommands.Has(Command::GATHER))
 	{
 		newOrders.type = Orders::GATHER;
 		newOrders.target = player.FlagshipPtr();
@@ -642,7 +469,6 @@ void AI::Clean()
 {
 	actions.clear();
 	notoriety.clear();
-	formations.clear();
 	governmentActions.clear();
 	scanPermissions.clear();
 	playerActions.clear();
@@ -693,12 +519,6 @@ void AI::Step(const PlayerInfo &player, Command &activeCommands)
 			int &value = fenceCount[&*it];
 			value = min(FENCE_MAX, value + FENCE_DECAY + 1);
 		}
-	
-	// Allow all formation-positioners to handle their internal administration to
-	// prepare for the next cycle.
-	for(auto &bIt : formations)
-		for(auto &pIt : bIt.second)
-			pIt.second.Step();
 	
 	const Ship *flagship = player.Flagship();
 	step = (step + 1) & 31;
@@ -1550,44 +1370,6 @@ bool AI::FollowOrders(Ship &ship, Command &command) const
 
 
 
-void AI::MoveInFormation(Ship &ship, Command &command)
-{
-	shared_ptr<Ship> parent = ship.GetParent();
-	if(!parent)
-		return;
-	
-	const Body *formationLead = parent.get();
-	const FormationPattern *pattern = ship.GetFormationPattern();
-	
-	// First we retrieve the patterns that are formed around the parent.
-	auto &patterns = formations[formationLead];
-	
-	// Find the existing FormationPositioner for the pattern, or add one if none exists yet.
-	auto insert = patterns.emplace(piecewise_construct,
-		forward_as_tuple(pattern),
-		forward_as_tuple(formationLead, pattern));
-
-	// Set an iterator to point to the just found or emplaced value.
-	auto it = insert.first;
-	
-	// Aggresively try to match the position and velocity for the formation position.
-	double POSITION_DEADBAND = ship.Radius() * 1.25;
-	static const double VELOCITY_DEADBAND = 0.1;
-	bool inPosition = MoveTo(ship, command, it->second.Position(&ship), formationLead->Velocity(), POSITION_DEADBAND, VELOCITY_DEADBAND);
-	
-	// If we match the position and velocity, then also match the facing angle.
-	if(inPosition)
-	{
-		double facingDelta = formationLead->Facing().Degrees() - ship.Facing().Degrees();
-		if(abs(facingDelta) > 180.)
-			facingDelta += (facingDelta < 0. ? 360. : -360.);
-		
-		command.SetTurn(facingDelta);
-	}
-}
-
-
-
 void AI::MoveIndependent(Ship &ship, Command &command) const
 {
 	shared_ptr<const Ship> target = ship.GetTargetShip();
@@ -1769,7 +1551,7 @@ void AI::MoveIndependent(Ship &ship, Command &command) const
 
 
 
-void AI::MoveEscort(Ship &ship, Command &command)
+void AI::MoveEscort(Ship &ship, Command &command) const
 {
 	const Ship &parent = *ship.GetParent();
 	bool hasFuelCapacity = ship.Attributes().Get("fuel capacity") && ship.JumpFuel();
@@ -1857,15 +1639,11 @@ void AI::MoveEscort(Ship &ship, Command &command)
 			MoveToPlanet(ship, command);
 			command |= Command::LAND;
 		}
-		else if(ship.GetFormationPattern())
-			MoveInFormation(ship, command);
 		else
 			KeepStation(ship, command, parent);
 	}
 	else if(parent.Commands().Has(Command::BOARD) && parent.GetTargetShip().get() == &ship)
 		Stop(ship, command, .2);
-	else if(ship.GetFormationPattern())
-		MoveInFormation(ship, command);
 	else
 		KeepStation(ship, command, parent);
 }

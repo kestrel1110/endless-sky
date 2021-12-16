@@ -26,7 +26,6 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 #include "Fleet.h"
 #include "FogShader.h"
 #include "text/FontSet.h"
-#include "FormationPattern.h"
 #include "Galaxy.h"
 #include "GameEvent.h"
 #include "Government.h"
@@ -76,7 +75,6 @@ namespace {
 	Set<Effect> effects;
 	Set<GameEvent> events;
 	Set<Fleet> fleets;
-	Set<FormationPattern> formations;
 	Set<Galaxy> galaxies;
 	Set<Government> governments;
 	Set<Hazard> hazards;
@@ -360,12 +358,6 @@ void GameData::CheckReferences()
 	for(auto &&it : systems)
 		if(it.second.Name().empty() && !NameIfDeferred(deferred["system"], it))
 			NameAndWarn("system", it);
-
-	// Formation patterns are not serialized, but their usage is.
-	for(auto &it : formations)
-		if(it.second.Name().empty())
-			NameAndWarn("formation", it);
-
 	// Hazards are never serialized.
 	for(const auto &it : hazards)
 		if(!it.second.IsValid())
@@ -743,13 +735,6 @@ const Set<GameEvent> &GameData::Events()
 
 
 
-const Set<FormationPattern> &GameData::Formations()
-{
-	return formations;
-}
-
-
-
 const Set<Fleet> &GameData::Fleets()
 {
 	return fleets;
@@ -1109,8 +1094,6 @@ void GameData::LoadFile(const string &path, bool debugMode)
 			events.Get(node.Token(1))->Load(node);
 		else if(key == "fleet" && node.Size() >= 2)
 			fleets.Get(node.Token(1))->Load(node);
-		else if(key == "formation" && node.Size() >= 2)
-			formations.Get(node.Token(1))->Load(node);
 		else if(key == "galaxy" && node.Size() >= 2)
 			galaxies.Get(node.Token(1))->Load(node);
 		else if(key == "government" && node.Size() >= 2)
