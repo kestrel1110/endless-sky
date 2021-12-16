@@ -35,6 +35,7 @@ class DataNode;
 class DataWriter;
 class Effect;
 class Flotsam;
+class FormationPattern;
 class Government;
 class Minable;
 class Phrase;
@@ -400,6 +401,11 @@ public:
 	// Mining target.
 	std::shared_ptr<Minable> GetTargetAsteroid() const;
 	std::shared_ptr<Flotsam> GetTargetFlotsam() const;
+	// Pattern to use when flying in a formation.
+	const FormationPattern *GetFormationPattern() const;
+	unsigned int GetFormationRing() const;
+	void SetFormationRing(int newRing);
+	
 	
 	// Set this ship's targets.
 	void SetTargetShip(const std::shared_ptr<Ship> &ship);
@@ -409,6 +415,8 @@ public:
 	// Mining target.
 	void SetTargetAsteroid(const std::shared_ptr<Minable> &asteroid);
 	void SetTargetFlotsam(const std::shared_ptr<Flotsam> &flotsam);
+	// Pattern to use when flying in a formation (nullptr to clear formation).
+	void SetFormationPattern(const FormationPattern *formation);
 	
 	// Manage escorts. When you set this ship's parent, it will automatically
 	// register itself as an escort of that ship, and unregister itself from any
@@ -586,6 +594,8 @@ private:
 	const System *targetSystem = nullptr;
 	std::weak_ptr<Minable> targetAsteroid;
 	std::weak_ptr<Flotsam> targetFlotsam;
+	const FormationPattern *formationPattern = nullptr;
+	unsigned int formationRing = 0;
 	
 	// Links between escorts and parents.
 	std::vector<std::weak_ptr<Ship>> escorts;
