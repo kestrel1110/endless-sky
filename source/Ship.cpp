@@ -1877,7 +1877,7 @@ void Ship::Move(vector<Visual> &visuals, list<shared_ptr<Flotsam>> &flotsam)
 	shared_ptr<const Ship> target = GetTargetShip();
 	// If this is a fighter or drone and it is not assisting someone at the
 	// moment, its boarding target should be its parent ship.
-	if(CanBeCarried() && !(target && target == GetShipToAssist()))
+	if(CanBeCarried() && !(target && target == GetShipToAssist()) && GetParent())
 		target = GetParent();
 	if(target && !isDisabled)
 	{
@@ -2830,18 +2830,10 @@ void Ship::WasCaptured(const shared_ptr<Ship> &capturer)
 		AddCrew(transfer);
 	}
 	
-	commands.Clear();
+	// Clear this ship's previous targets.
+	ClearTargetsAndOrders();
 	// Set the capturer as this ship's parent.
 	SetParent(capturer);
-	// Clear this ship's previous targets.
-	SetTargetShip(shared_ptr<Ship>());
-	SetTargetStellar(nullptr);
-	SetTargetSystem(nullptr);
-	shipToAssist.reset();
-	targetAsteroid.reset();
-	targetFlotsam.reset();
-	hyperspaceSystem = nullptr;
-	landingPlanet = nullptr;
 	
 	// This ship behaves like its new parent does.
 	isSpecial = capturer->isSpecial;
@@ -2862,6 +2854,22 @@ void Ship::WasCaptured(const shared_ptr<Ship> &capturer)
 	}
 	// This ship should not care about its now-unallied escorts.
 	escorts.clear();
+}
+
+
+
+// Clear all orders and targets this ship has (after capture or transfer of control).
+void Ship::ClearTargetsAndOrders()
+{
+	commands.Clear();
+	SetTargetShip(shared_ptr<Ship>());
+	SetTargetStellar(nullptr);
+	SetTargetSystem(nullptr);
+	shipToAssist.reset();
+	targetAsteroid.reset();
+	targetFlotsam.reset();
+	hyperspaceSystem = nullptr;
+	landingPlanet = nullptr;
 }
 
 
@@ -3403,14 +3411,6 @@ bool Ship::CanCarry(const Ship &ship) const
 			--free;
 	}
 	return (free > 0);
-}
-
-
-
-void Ship::AllowCarried(bool allowCarried)
-{
-	const auto &bayCategories = GameData::Category(CategoryType::BAY);
-	canBeCarried = allowCarried && find(bayCategories.begin(), bayCategories.end(), attributes.Category()) != bayCategories.end();
 }
 
 

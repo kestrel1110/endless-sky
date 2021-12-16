@@ -1361,6 +1361,9 @@ void Engine::CalculateStep()
 	// Move all the ships.
 	for(const shared_ptr<Ship> &it : ships)
 		MoveShip(it);
+	// MoveShip could have changed the flagship due to docking or swapping ships, so
+	// retrieve the flagship again.
+	flagship = player.Flagship();
 	// If the flagship just began jumping, play the appropriate sound.
 	if(!wasHyperspacing && flagship && flagship->IsEnteringHyperspace())
 	{
@@ -1613,6 +1616,18 @@ void Engine::MoveShip(const shared_ptr<Ship> &ship)
 	// Boarding:
 	bool autoPlunder = !ship->IsYours();
 	shared_ptr<Ship> victim = ship->Board(autoPlunder);
+	if(ship.get() == flagship && !ship->GetSystem())
+	{
+		// If the players flagship just docked, then it got the new flagship as parent.
+		shared_ptr<Ship> newFlag = ship->GetParent();
+		if(newFlag)
+			ChangePlayerFlagship(*flagship, *newFlag);
+		else
+		{
+			Files::LogError("Engine::MoveShip: Undocked flagship without system!");
+			ship->SetSystem(player.GetSystem());
+		}
+	}
 	if(victim)
 		eventQueue.emplace_back(ship, victim,
 			ship->GetGovernment()->IsEnemy(victim->GetGovernment()) ?
@@ -1629,6 +1644,22 @@ void Engine::MoveShip(const shared_ptr<Ship> &ship)
 	// system ready to fire.
 	if(ship->Fire(newProjectiles, newVisuals))
 		hasAntiMissile.push_back(ship.get());
+}
+
+
+
+// Changing the players flagship during flight requires an update of all active
+// data that references the players flagship.
+void Engine::ChangePlayerFlagship(const Ship &oldFlagship, Ship &newFlagship)
+{
+	// Let PlayerInfo handle the default administration (like the players escorts).
+	player.SetFlagship(newFlagship);
+	
+	// Update all ships that still have the old flagship as parent, for example
+	// NPCs that are following the player.
+	for(auto &ship : ships)
+		if(ship && ship->GetParent().get() == &oldFlagship)
+			ship->SetParent(newFlagship.shared_from_this());
 }
 
 
