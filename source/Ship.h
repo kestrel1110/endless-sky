@@ -266,6 +266,8 @@ public:
 	bool IsReadyToJump(bool waitingIsReady = false) const;
 	// Get this ship's custom swizzle.
 	int CustomSwizzle() const;
+	// Get the vector of all the recent hits this ship has taken.
+	std::vector<std::pair<Point, double>> *RecentHits();
 
 	// Check if the ship is thrusting. If so, the engine sound should be played.
 	bool IsThrusting() const;
@@ -363,7 +365,8 @@ public:
 	// DamageDealt from that weapon. The return value is a ShipEvent type,
 	// which may be a combination of PROVOKED, DISABLED, and DESTROYED.
 	// Create any target effects as sparks.
-	int TakeDamage(std::vector<Visual> &visuals, const DamageDealt &damage, const Government *sourceGovernment);
+	int TakeDamage(std::vector<Visual> &visuals, const DamageDealt &damage, const Government *sourceGovernment,
+		const Point &damageSource = Point());
 	// Apply a force to this ship, accelerating it. This might be from a weapon
 	// impact, or from firing a weapon, for example.
 	void ApplyForce(const Point &force, bool gravitational = false);
@@ -618,6 +621,9 @@ private:
 	unsigned explosionCount = 0;
 	unsigned explosionTotal = 0;
 	std::map<const Effect *, int> finalExplosions;
+
+	// Vector of recent hits the ship has taken.
+	std::vector<std::pair<Point, double>> recentHits;
 
 	// Target ships, planets, systems, etc.
 	std::weak_ptr<Ship> targetShip;
