@@ -52,6 +52,8 @@ namespace {
 		{"cloaking energy", 0},
 		{"cloaking fuel", 0},
 		{"cloaking heat", 0},
+		{"cloaking shield", 0},
+		{"cloaked firing", 0},
 		{"cooling", 0},
 		{"cooling energy", 0},
 		{"corrosion resistance energy", 0},
@@ -173,6 +175,7 @@ namespace {
 		{"shield heat multiplier", 3},
 		{"threshold percentage", 3},
 		{"overheat damage threshold", 3},
+		{"cloak by mass", 3},
 
 		{"burn protection", 4},
 		{"corrosion protection", 4},
@@ -191,10 +194,14 @@ namespace {
 		{"piercing protection", 4},
 		{"shield protection", 4},
 		{"slowing protection", 4},
+		{"cloak hull protection", 4},
+		{"cloak shield protection", 4},
 
 		{"repair delay", 5},
+		{"cloaking repair delay", 5},
 		{"disabled repair delay", 5},
 		{"shield delay", 5},
+		{"cloaking shield delay", 5},
 		{"depleted shield delay", 5}
 	};
 
@@ -204,7 +211,13 @@ namespace {
 		{"hyperdrive", "Allows you to make hyperjumps."},
 		{"jump drive", "Lets you jump to any nearby system."},
 		{"minable", "This item is mined from asteroids."},
-		{"atrocity", "This outfit is considered an atrocity."}
+		{"atrocity", "This outfit is considered an atrocity."},
+		{"cloaked afterburner", "You may use your afterburner when cloaked"},
+		{"cloaked boarding", "You may board even when cloaked."},
+		{"cloaked communication", "You may make hails when cloaked."},
+		{"cloaked deployment", "You may deploy drones and fighters without revealing your location."},
+		{"cloaked pickup", "You may pickup items with this cloak."},
+		{"cloaked scanning", "You may scan other ships when cloaked."}
 	};
 
 	bool IsNotRequirement(const string &label)

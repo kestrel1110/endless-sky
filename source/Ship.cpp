@@ -1469,7 +1469,7 @@ bool Ship::CanSendHail(const PlayerInfo &player, bool allowUntranslated) const
 		return false;
 
 	// Make sure this ship is able to send a hail.
-	if(IsDisabled() || !Crew() || Cloaking() >= 1. || GetPersonality().IsMute())
+	if(CannotAct(Ship::ActionType::COMMUNICATION) || GetPersonality().IsMute())
 		return false;
 
 	// Ships that don't share a language with the player shouldn't communicate when hailed directly.
@@ -1577,16 +1577,36 @@ void Ship::Move(vector<Visual> &visuals, list<shared_ptr<Flotsam>> &flotsam)
 		if(!cloak)
 			cloakDisruption = max(0., cloakDisruption - 1.);
 
-		double cloakingSpeed = attributes.Get("cloak");
+		// Attempting to cloak when the cloaking device can no longer operate (because of hull damage)
+		// will result in it being uncloaked.
+		const double minimalHullForCloak = attributes.Get("cloak hull threshold");
+		if(minimalHullForCloak && (hull / attributes.Get("hull") < minimalHullForCloak))
+			cloakDisruption = 1.;
+
+		const double cloakingSpeed = CloakingSpeed();
+		const double cloakingFuel = attributes.Get("cloaking fuel");
+		const double cloakingEnergy = attributes.Get("cloaking energy");
+		const double cloakingHull = attributes.Get("cloaking hull");
+		const double cloakingShield = attributes.Get("cloaking shield");
 		bool canCloak = (!isDisabled && cloakingSpeed > 0. && !cloakDisruption
-			&& fuel >= attributes.Get("cloaking fuel")
-			&& energy >= attributes.Get("cloaking energy"));
+			&& fuel >= cloakingFuel && energy >= cloakingEnergy
+			&& MinimumHull() < hull - cloakingHull && shields >= cloakingShield);
 		if(commands.Has(Command::CLOAK) && canCloak)
 		{
-			cloak = min(1., cloak + cloakingSpeed);
-			fuel -= attributes.Get("cloaking fuel");
-			energy -= attributes.Get("cloaking energy");
+			cloak = min(1., max(0., cloak + cloakingSpeed));
+			fuel -= cloakingFuel;
+			energy -= cloakingEnergy;
+			shields -= cloakingShield;
+			hull -= cloakingHull;
 			heat += attributes.Get("cloaking heat");
+			double cloakingShieldDelay = attributes.Get("cloaking shield delay");
+			double cloakingHullDelay = attributes.Get("cloaking repair delay");
+			cloakingShieldDelay = (cloakingShieldDelay < 1.) ?
+				(Random::Real() <= cloakingShieldDelay) : cloakingShieldDelay;
+			cloakingHullDelay = (cloakingHullDelay < 1.) ?
+				(Random::Real() <= cloakingHullDelay) : cloakingHullDelay;
+			shieldDelay += cloakingShieldDelay;
+			hullDelay += cloakingHullDelay;
 		}
 		else if(cloakingSpeed)
 		{
@@ -2051,7 +2071,7 @@ void Ship::Move(vector<Visual> &visuals, list<shared_ptr<Flotsam>> &flotsam)
 			}
 		}
 		bool applyAfterburner = (commands.Has(Command::AFTERBURNER) || (thrustCommand > 0. && !thrust))
-				&& !CannotAct();
+				&& !CannotAct(Ship::ActionType::AFTERBURNER);
 		if(applyAfterburner)
 		{
 			thrust = attributes.Get("afterburner thrust");
@@ -2169,11 +2189,11 @@ void Ship::Move(vector<Visual> &visuals, list<shared_ptr<Flotsam>> &flotsam)
 
 			if(distance < 10. && speed < 1. && (CanBeCarried() || !turn))
 			{
-				if(cloak)
+				if(cloak && !attributes.Get("cloaked boarding"))
 				{
 					// Allow the player to get all the way to the end of the
 					// boarding sequence (including locking on to the ship) but
-					// not to actually board, if they are cloaked.
+					// not to actually board, if they are cloaked, except if they have "cloaked boarding".
 					if(isYours)
 						Messages::Add("You cannot board a ship while cloaked.", Messages::Importance::High);
 				}
@@ -2537,7 +2557,8 @@ void Ship::Launch(list<shared_ptr<Ship>> &ships, vector<Visual> &visuals)
 	// is landing, jumping, or cloaked. If already destroyed (e.g. self-destructing),
 	// eject any ships still docked, possibly destroying them in the process.
 	bool ejecting = IsDestroyed();
-	if(!ejecting && (!commands.Has(Command::DEPLOY) || zoom != 1.f || hyperspaceCount || cloak))
+	if(!ejecting && (!commands.Has(Command::DEPLOY) || zoom != 1.f || hyperspaceCount ||
+			(cloak && !attributes.Get("cloaked deployment"))))
 		return;
 
 	for(Bay &bay : bays)
@@ -2617,7 +2638,7 @@ shared_ptr<Ship> Ship::Board(bool autoPlunder, bool nonDocking)
 	hasBoarded = false;
 
 	shared_ptr<Ship> victim = GetTargetShip();
-	if(CannotAct() || !victim || victim->IsDestroyed() || victim->GetSystem() != GetSystem())
+	if(CannotAct(Ship::ActionType::BOARD) || !victim || victim->IsDestroyed() || victim->GetSystem() != GetSystem())
 		return shared_ptr<Ship>();
 
 	// For a fighter or drone, "board" means "return to ship." Except when the ship is
@@ -2678,7 +2699,7 @@ shared_ptr<Ship> Ship::Board(bool autoPlunder, bool nonDocking)
 // giving the types of scan that succeeded.
 int Ship::Scan(const PlayerInfo &player)
 {
-	if(!commands.Has(Command::SCAN) || CannotAct())
+	if(!commands.Has(Command::SCAN) || CannotAct(Ship::ActionType::SCAN))
 		return 0;
 
 	shared_ptr<const Ship> target = GetTargetShip();
@@ -2835,7 +2856,7 @@ bool Ship::Fire(vector<Projectile> &projectiles, vector<Visual> &visuals)
 	if(IsDestroyed() && explosionCount == explosionTotal && explosionWeapon)
 		projectiles.emplace_back(position, explosionWeapon);
 
-	if(CannotAct())
+	if(CannotAct(Ship::ActionType::FIRE))
 		return false;
 
 	antiMissileRange = 0.;
@@ -2851,7 +2872,15 @@ bool Ship::Fire(vector<Projectile> &projectiles, vector<Visual> &visuals)
 			if(weapon->AntiMissile())
 				antiMissileRange = max(antiMissileRange, weapon->Velocity() + weaponRadius);
 			else if(firingCommands.HasFire(i))
+			{
 				armament.Fire(i, *this, projectiles, visuals, Random::Real() < jamChance);
+				if(cloak)
+				{
+					double cloakingFiring = attributes.Get("cloaked firing");
+					// Any negative value means this does not take off any cloak.
+					cloak -= cloakingFiring > 0. ? cloakingFiring : 0.;
+				}
+			}
 		}
 	}
 
@@ -2867,7 +2896,7 @@ bool Ship::FireAntiMissile(const Projectile &projectile, vector<Visual> &visuals
 {
 	if(projectile.Position().Distance(position) > antiMissileRange)
 		return false;
-	if(CannotAct())
+	if(CannotAct(Ship::ActionType::FIRE))
 		return false;
 
 	double jamChance = CalculateJamChance(Energy(), scrambling);
@@ -2918,7 +2947,15 @@ bool Ship::IsCapturable() const
 
 bool Ship::IsTargetable() const
 {
-	return (zoom == 1.f && !explosionRate && !forget && !isInvisible && cloak < 1. && hull >= 0. && hyperspaceCount < 70);
+	return (zoom == 1.f && !explosionRate && !forget && !isInvisible && IsCloakTargetable()
+		&& hull >= 0. && hyperspaceCount < 70);
+}
+
+
+
+bool Ship::IsCloakTargetable() const
+{
+	return cloak < 1.;
 }
 
 
@@ -2980,9 +3017,29 @@ bool Ship::CanLand() const
 
 
 
-bool Ship::CannotAct() const
+bool Ship::CannotAct(ActionType actionType) const
 {
-	return (zoom != 1.f || isDisabled || hyperspaceCount || pilotError || cloak);
+	bool canActCloaked = true;
+	if(cloak)
+		switch(actionType)
+		{
+			case ActionType::AFTERBURNER:
+				canActCloaked = attributes.Get("cloaked afterburner");
+			case ActionType::BOARD:
+				canActCloaked = attributes.Get("cloaked boarding");
+			case ActionType::COMMUNICATION:
+				canActCloaked = attributes.Get("cloaked communication");
+			case ActionType::FIRE:
+				canActCloaked = attributes.Get("cloaked firing");
+			case ActionType::PICKUP:
+				canActCloaked = attributes.Get("cloaked pickup");
+			case ActionType::SCAN:
+				canActCloaked = attributes.Get("cloaked scanning");
+		}
+	bool canSendHail = (actionType != ActionType::COMMUNICATION || crew);
+	return (zoom != 1.f || isDisabled || hyperspaceCount || pilotError || !canSendHail
+		|| ((cloak == 1. && !canActCloaked)
+		|| (cloak != 1. && cloak && !cloakDisruption && !canActCloaked)));
 }
 
 
@@ -2990,6 +3047,31 @@ bool Ship::CannotAct() const
 double Ship::Cloaking() const
 {
 	return isInvisible ? 1. : cloak;
+}
+
+
+
+bool Ship::IsCloaked() const
+{
+	return Cloaking() == 1.;
+}
+
+
+
+double Ship::CloakingSpeed() const
+{
+	return attributes.Get("cloak") + attributes.Get("cloak by mass") * 1000. / Mass();
+}
+
+
+
+bool Ship::Phases(Projectile projectile) const
+{
+	bool phases = IsCloaked() && (projectile.Phases(*this) ||
+		attributes.Get("cloak phasing") >= Random::Real());
+	if(phases)
+		projectile.SetPhases(*this);
+	return phases;
 }
 
 

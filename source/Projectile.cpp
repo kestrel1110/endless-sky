@@ -129,7 +129,10 @@ void Projectile::Move(vector<Visual> &visuals, vector<Projectile> &projectiles)
 
 			for(const auto &it : weapon->Submunitions())
 				for(size_t i = 0; i < it.count; ++i)
-					projectiles.emplace_back(*this, it.offset, it.facing + Projectile::Inaccuracy(it.weapon->Inaccuracy()), it.weapon);
+					projectiles.emplace_back(*this, it.offset, it.facing + Projectile::Inaccuracy(it.weapon->Inaccuracy() +
+						(cachedTarget && cachedTarget->IsCloaked() ?
+						(1. - cachedTarget->Attributes().Get("cloak infrared traceability")) * 5. : 0.)),
+						it.weapon);
 		}
 		MarkForRemoval();
 		return;
@@ -442,4 +445,18 @@ void Projectile::CheckLock(const Ship &target)
 double Projectile::DistanceTraveled() const
 {
 	return distanceTraveled;
+}
+
+
+
+bool Projectile::Phases(const Ship &ship) const
+{
+	return phasedShips.count(&ship);
+}
+
+
+
+void Projectile::SetPhases(const Ship &ship)
+{
+	phasedShips.emplace(&ship);
 }

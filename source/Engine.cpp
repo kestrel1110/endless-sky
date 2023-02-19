@@ -138,7 +138,6 @@ namespace {
 		added.clear();
 	}
 
-
 	// Author the given message from the given ship.
 	void SendMessage(const shared_ptr<const Ship> &ship, const string &message)
 	{
@@ -641,7 +640,8 @@ void Engine::Step(bool isActive)
 	if(isActive && Preferences::Has("Show status overlays"))
 		for(const auto &it : ships)
 		{
-			if(!it->GetGovernment() || it->GetSystem() != currentSystem || it->Cloaking() == 1.)
+			if(!it->GetGovernment() || it->GetSystem() != currentSystem ||
+					!it->IsCloakTargetable())
 				continue;
 			// Don't show status for dead ships.
 			if(it->IsDestroyed())
@@ -793,7 +793,7 @@ void Engine::Step(bool isActive)
 	}
 	else
 	{
-		if(target->GetSystem() == player.GetSystem() && target->Cloaking() < 1.)
+		if(target->GetSystem() == player.GetSystem() && target->IsCloakTargetable())
 			targetUnit = target->Facing().Unit();
 		info.SetSprite("target sprite", target->GetSprite(), targetUnit, target->GetFrame(step));
 		info.SetString("target name", target->Name());
@@ -1997,7 +1997,7 @@ void Engine::HandleMouseClicks()
 	double clickRange = 50.;
 	shared_ptr<Ship> clickTarget;
 	for(shared_ptr<Ship> &ship : ships)
-		if(ship->GetSystem() == playerSystem && &*ship != flagship && ship->IsTargetable())
+		if(ship->GetSystem() == playerSystem && &*ship != flagship && (ship->IsTargetable() || ship->IsYours()))
 		{
 			Point position = ship->Position() - flagship->Position();
 			const Mask &mask = ship->GetMask(step);
@@ -2127,12 +2127,15 @@ void Engine::DoCollisions(Projectile &projectile)
 		double triggerRadius = projectile.GetWeapon().TriggerRadius();
 		if(triggerRadius)
 			for(const Body *body : shipCollisions.Circle(projectile.Position(), triggerRadius))
+			{
+				const Ship *ship = reinterpret_cast<const Ship *>(body);
 				if(body == projectile.Target() || (gov->IsEnemy(body->GetGovernment())
-						&& reinterpret_cast<const Ship *>(body)->Cloaking() < 1.))
+						&& ship->IsCloakTargetable()))
 				{
 					closestHit = 0.;
 					break;
 				}
+			}
 
 		// If nothing triggered the projectile, check for collisions with ships.
 		if(closestHit > 0.)
@@ -2140,8 +2143,14 @@ void Engine::DoCollisions(Projectile &projectile)
 			Ship *ship = reinterpret_cast<Ship *>(shipCollisions.Line(projectile, &closestHit));
 			if(ship)
 			{
-				hit = ship->shared_from_this();
-				hitVelocity = ship->Velocity();
+				// Check if we can hit this.
+				if(ship->Phases(projectile))
+					closestHit = 1.;
+				else
+				{
+					hit = ship->shared_from_this();
+					hitVelocity = ship->Velocity();
+				}
 			}
 		}
 		// "Phasing" projectiles can pass through asteroids. For all other
@@ -2180,7 +2189,7 @@ void Engine::DoCollisions(Projectile &projectile)
 			{
 				Ship *ship = reinterpret_cast<Ship *>(body);
 				bool targeted = (projectile.Target() == ship);
-				if(isSafe && !targeted && !gov->IsEnemy(ship->GetGovernment()))
+				if((isSafe && !targeted && !gov->IsEnemy(ship->GetGovernment())) || ship->Phases(projectile))
 					continue;
 
 				// Only directly targeted ships get provoked by blast weapons.
@@ -2245,13 +2254,13 @@ void Engine::DoWeather(Weather &weather)
 // Check if any ship collected the given flotsam.
 void Engine::DoCollection(Flotsam &flotsam)
 {
-	// Check if any ship can pick up this flotsam. Cloaked ships cannot act.
+	// Check if any ship can pick up this flotsam. Cloaked ships without "cloaked pickup" cannot act.
 	Ship *collector = nullptr;
 	for(Body *body : shipCollisions.Circle(flotsam.Position(), 5.))
 	{
 		Ship *ship = reinterpret_cast<Ship *>(body);
-		if(!ship->CannotAct() && ship != flotsam.Source() && ship->GetGovernment() != flotsam.SourceGovernment()
-			&& ship->Cargo().Free() >= flotsam.UnitSize())
+		if(!ship->CannotAct(Ship::ActionType::PICKUP) && ship != flotsam.Source() &&
+			ship->GetGovernment() != flotsam.SourceGovernment() && ship->Cargo().Free() >= flotsam.UnitSize())
 		{
 			collector = ship;
 			break;
@@ -2362,9 +2371,9 @@ void Engine::FillRadar()
 	for(shared_ptr<Ship> &ship : ships)
 		if(ship->GetSystem() == playerSystem)
 		{
-			// Do not show cloaked ships on the radar, except the player's ships.
+			// Do not show cloaked ships on the radar, except the player's ships, and those who should show on radar.
 			bool isYours = ship->IsYours();
-			if(ship->Cloaking() >= 1. && !isYours)
+			if(ship->IsCloaked() && !isYours && !ship->Attributes().Get("cloak radar traceability"))
 				continue;
 
 			// Figure out what radar color should be used for this ship.
